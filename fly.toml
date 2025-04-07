@@ -9,6 +9,11 @@ primary_region = "ord"  # Chicago
   PORT = "8080"
   BP_PYTHON_VERSION = "3.11"
 
+[compute]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+
 [[services]]
   protocol = "tcp"
   internal_port = 8080
