@@ -17,6 +17,7 @@ database = "Bitcoin"
 influx_client = InfluxDBClient3(host=host, token=influx_token, org=org)
 alpaca_client = CryptoDataStream(alpaca_key, alpaca_secret)
 
+
 @dataclass
 class Quote:
     symbol: str
@@ -36,7 +37,8 @@ class Quote:
             .field("ask_size", self.ask_size)
             .time(self.timestamp)
         )
-        
+
+
 @dataclass
 class Bar:
     symbol: str
@@ -97,5 +99,5 @@ async def bar_handler(data):
     print(f"Wrote {data} to Bars DB")
 
 alpaca_client.subscribe_bars(bar_handler, "BTC/USD")
-alpaca_client.subscribe_quotes(quote_handler,"BTC/USD")
+alpaca_client.subscribe_quotes(quote_handler, "BTC/USD")
 alpaca_client.run()

@@ -1,13 +1,13 @@
-# fly.toml app configuration file generated for financebot on 2025-04-06T21:47:33-07:00
+# fly.toml app configuration file generated for alpaca-processor-v1 on 2025-04-07T22:13:30-07:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'financebot'
+app = 'alpaca-processor-v1'
 primary_region = 'lax'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
   PORT = '8080'
@@ -21,7 +21,5 @@ primary_region = 'lax'
   max_machines_running = 1
   processes = ['app']
 
-[compute]
-  cpu_kind = "shared"
-  cpus = 1
-  memory_mb = 256
+[[vm]]
+  size = 'shared-cpu-1x'
