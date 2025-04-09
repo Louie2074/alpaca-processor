@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 import datetime
 import os
 from dotenv import load_dotenv
@@ -10,6 +10,7 @@ load_dotenv()
 alpaca_key = os.getenv("ALPACA_KEY")
 alpaca_secret = os.getenv("ALPACA_SECRET")
 influx_token = os.getenv("INFLUXDB_TOKEN")
+
 org = "Dev"
 host = "https://us-east-1-1.aws.cloud2.influxdata.com"
 database = "Bitcoin"
