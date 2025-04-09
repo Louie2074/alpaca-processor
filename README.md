@@ -1,6 +1,6 @@
-# Finance Bot
+# Alpaca Processor
 
-A Python application for streaming and processing cryptocurrency data.
+A Python application for streaming and processing stock data streams for Time Series DB ingestion.
 
 ## Setup
 
