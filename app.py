@@ -1,104 +1,67 @@
-from dataclasses import dataclass
-import datetime
 import os
+from typing import List
+
+from alpaca.data.historical import StockHistoricalDataClient
+from alpaca.data.requests import StockBarsRequest
 from dotenv import load_dotenv
-from influxdb_client_3 import InfluxDBClient3, Point
-from alpaca.data.live import CryptoDataStream
+from fastapi import FastAPI, HTTPException, Query
+
+from utils import bars_to_response, parse_epoch_millis, parse_timeframe
 
 load_dotenv()
 
-alpaca_key = os.getenv("ALPACA_KEY")
-alpaca_secret = os.getenv("ALPACA_SECRET")
-influx_token = os.getenv("INFLUXDB_TOKEN")
+ALPACA_KEY = os.getenv("ALPACA_KEY")
+ALPACA_SECRET = os.getenv("ALPACA_SECRET")
 
-org = "Dev"
-host = "https://us-east-1-1.aws.cloud2.influxdata.com"
-database = "Bitcoin"
+if not ALPACA_KEY or not ALPACA_SECRET:
+    raise RuntimeError(
+        "ALPACA_KEY and ALPACA_SECRET environment variables are required.")
 
-influx_client = InfluxDBClient3(host=host, token=influx_token, org=org)
-alpaca_client = CryptoDataStream(alpaca_key, alpaca_secret)
-
-
-@dataclass
-class Quote:
-    symbol: str
-    timestamp: datetime
-    bid_price: float
-    bid_size: float
-    ask_price: float
-    ask_size: float
-
-    def to_point(self) -> Point:
-        return (
-            Point("btc_quotes")
-            .tag("symbol", self.symbol)
-            .field("bid_price", self.bid_price)
-            .field("bid_size", self.bid_size)
-            .field("ask_price", self.ask_price)
-            .field("ask_size", self.ask_size)
-            .time(self.timestamp)
-        )
+stock_client = StockHistoricalDataClient(ALPACA_KEY, ALPACA_SECRET)
+app = FastAPI(title="FinanceBot Data API")
 
 
-@dataclass
-class Bar:
-    symbol: str
-    timestamp: datetime
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: float
-    trade_count: float
-    vwap: float
+@app.get("/stocks/bars")
+async def get_stock_bars(
+    symbols: List[str] = Query(..., min_length=1),
+    timeframe: str = Query(..., description="Examples: 1Day, 1Hour, 15Min"),
+    start: int = Query(...,
+                       description="Start time as epoch milliseconds (e.g. 1704067200000)"),
+    end: int = Query(...,
+                     description="End time as epoch milliseconds (e.g. 1704153600000)"),
+):
+    """
+    Get historical stock bar data.
 
-    def to_point(self) -> Point:
-        return (
-            Point("btc_bars")
-            .tag("symbol", self.symbol)
-            .field("open", self.open)
-            .field("high", self.high)
-            .field("low", self.low)
-            .field("close", self.close)
-            .field("volume", self.volume)
-            .field("trade_count", self.trade_count)
-            .field("vwap", self.vwap)
-            .time(self.timestamp)
-        )
+    Example URLs:
+        Single symbol:
+        /stocks/bars?symbols=AAPL&timeframe=1Day&start=1704067200000&end=1766185583116
 
+        Multiple symbols:
+        /stocks/bars?symbols=AAPL&symbols=MSFT&symbols=GOOGL&timeframe=1Hour&start=1704067200000&end=1765235227
 
-async def quote_handler(data):
-    quote = Quote(
-        symbol=data.symbol,
-        timestamp=data.timestamp,
-        bid_price=data.bid_price,
-        bid_size=data.bid_size,
-        ask_price=data.ask_price,
-        ask_size=data.ask_size
-    )
+    Returns an array of bar objects with fields: t (timestamp in epoch ms), o (open), h (high), 
+    l (low), c (close), v (volume), n (trade count), vw (volume weighted average price).
+    """
+    tf = parse_timeframe(timeframe)
+    start_dt = parse_epoch_millis(start)
+    end_dt = parse_epoch_millis(end)
 
-    point = quote.to_point()
-    influx_client.write(database=database, record=point)
-    print(f"Wrote {data} to Quotes DB")
+    request = StockBarsRequest(
+        symbol_or_symbols=symbols, timeframe=tf, start=start_dt, end=end_dt)
+    try:
+        bars = stock_client.get_stock_bars(request)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return bars_to_response(bars.df)
 
 
-async def bar_handler(data):
-    bar = Bar(
-        symbol=data.symbol,
-        timestamp=data.timestamp,
-        open=data.open,
-        high=data.high,
-        low=data.low,
-        close=data.close,
-        volume=data.volume,
-        trade_count=data.trade_count,
-        vwap=data.vwap
-    )
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
-    point = bar.to_point()
-    influx_client.write(database=database, record=point)
-    print(f"Wrote {data} to Bars DB")
 
-alpaca_client.subscribe_bars(bar_handler, "BTC/USD")
-alpaca_client.subscribe_quotes(quote_handler, "BTC/USD")
-alpaca_client.run()
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="localhost", port=8000)
